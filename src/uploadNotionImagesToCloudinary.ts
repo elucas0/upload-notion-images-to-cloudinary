@@ -9,7 +9,7 @@ import { GetPageResponse } from '@notionhq/client/build/src/api-endpoints';
 
 export default async function uploadNotionImagesToCloudinary({
   notionToken = process.env.NOTION_TOKEN || '',
-  notionDatabaseId = process.env.NOTION_DATABASE_ID || undefined,
+  notionDatabaseIds = process.env.NOTION_DATABASE_IDS ? process.env.NOTION_DATABASE_IDS.split(',') : [],
   notionPageId = undefined,
   cloudinaryUrl = process.env.CLOUDINARY_URL || '',
   cloudinaryUploadFolder = process.env.CLOUDINARY_UPLOAD_FOLDER || '',
@@ -24,13 +24,13 @@ export default async function uploadNotionImagesToCloudinary({
   logLevel: 'none' | 'error' | 'info' | 'debug';
   uploadExternalsNotOnCloudinary?: boolean;
 } & (
-  | { notionDatabaseId: string; notionPageId?: undefined }
+  | { notionDatabaseIds: string[]; notionPageId?: undefined }
   | { notionDatabaseId?: undefined; notionPageId: string }
 )) {
   if (!notionToken) {
     throw new Error(`Missing argument notionToken. Pass it or set it as the env var NOTION_TOKEN`);
   }
-  if (!notionDatabaseId && !notionPageId) {
+  if (notionDatabaseIds.length === 0 && !notionPageId) {
     throw new Error(
       `Missing both arguments notionDatabaseId and notionPageId. Pass one of them it or set the database ID in an env var NOTION_DATABASE_ID`,
     );
@@ -43,6 +43,21 @@ export default async function uploadNotionImagesToCloudinary({
   log.debug(`Params`, { uploadExternalsNotOnCloudinary });
 
   const notionClient = new NotionClient(notionToken, log);
+
+  if (notionPageId) {
+    const page = await notionClient.getPage(notionPageId);
+    await processPage(page, notionClient, cloudinaryUploadFolder, uploadExternalsNotOnCloudinary, log);
+  } else {
+    for (const notionDatabaseId of notionDatabaseIds) {
+      const pages = await notionClient.getPagesFromDatabase(notionDatabaseId);
+      for (const page of pages) {
+        await processPage(page, notionClient, cloudinaryUploadFolder, uploadExternalsNotOnCloudinary, log);
+      }
+    }
+  }
+
+  log.debug('End');
+
 
   log.debug(
     notionPageId

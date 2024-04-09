@@ -20,28 +20,31 @@ export default class NotionClient {
     this.log = log;
   }
 
-  async getPagesFromDatabase(notionDatabaseId: string): Promise<GetPageResponse[]> {
-    let hasMore = true;
-    let nextCursor: string | null = null;
-    const pages: GetPageResponse[] = [];
+  async getPagesFromDatabase(notionDatabaseIds: string[]): Promise<GetPageResponse[]> {
+    const allPages: GetPageResponse[] = [];
 
-    while (hasMore) {
-      const result: QueryDatabaseResponse = await this.#client.databases.query({
-        database_id: notionDatabaseId,
-        start_cursor: nextCursor || undefined,
-      });
+    for (const notionDatabaseId of notionDatabaseIds) {
+      let hasMore = true;
+      let nextCursor: string | null = null;
 
-      pages.push(...(result.results as GetPageResponse[]));
+      while (hasMore) {
+        const result: QueryDatabaseResponse = await this.#client.databases.query({
+          database_id: notionDatabaseId,
+          start_cursor: nextCursor || undefined,
+        });
 
-      hasMore = result.has_more;
-      nextCursor = result.next_cursor;
+        allPages.push(...(result.results as GetPageResponse[]));
 
-      if (hasMore) {
-        this.log.debug('⚠️ More than 100 pages in db, fetching more...');
+        hasMore = result.has_more;
+        nextCursor = result.next_cursor;
+
+        if (hasMore) {
+          this.log.debug('⚠️ More than 100 pages in db, fetching more...');
+        }
       }
     }
 
-    return pages;
+    return allPages;
   }
 
   async getPage(notionPageId: string): Promise<GetPageResponse> {
